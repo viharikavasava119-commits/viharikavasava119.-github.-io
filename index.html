@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>LokJob – Local Job & Job Poster Near Your Area</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800;900&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getAuth,
+    RecaptchaVerifier,
+    signInWithPhoneNumber,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+  // ── REPLACE WITH YOUR FIREBASE CONFIG ──
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId:         "YOUR_PROJECT_ID",
+    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Expose to global scope so non-module code can access
+  window._fbAuth        = auth;
+  window._fbSignOut     = signOut;
+  window._RecaptchaVerifier  = RecaptchaVerifier;
+  window._signInWithPhone    = signInWithPhoneNumber;
+  window._firebaseReady = true;
+  window.dispatchEvent(new Event('firebaseReady'));
+</script>
+
+<style>
+  :root {
+    --blue: #1d4ed8;
+    --blue2: #3b82f6;
+    --blue-light: #dbeafe;
+    --orange: #f97316;
+    --orange2: #fb923c;
+    --orange-light: #ffedd5;
+    --dark: #0f172a;
+    --dark2: #1e293b;
+    --mid: #475569;
+    --soft: #94a3b8;
+    --border: #e2e8f0;
+    --bg: #f8fafc;
+    --white: #ffffff;
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --red: #dc2626;
+    --shadow: 0 4px 24px rgba(15,23,42,0.10);
+    --shadow-lg: 0 8px 40px rgba(15,23,42,0.16);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Nunito',sans-serif;background:#e8edf5;min-height:100vh;display:flex;justify-content:center;align-items:flex-start;}
+  #app{width:100%;max-width:430px;min-height:100vh;background:var(--white);position:relative;overflow:hidden;box-shadow:0 0 60px rgba(0,0,0,0.18);}
+  .page{display:none;flex-direction:column;min-height:100vh;animation:fadeIn .35s ease;}
+  .page.active{display:flex;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+  @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  @keyframes shimmer{0%{background-position:-200% center;}100%{background-position:200% center;}}
+
+  /* ── TOAST ── */
+  #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--dark);color:#fff;border-radius:50px;padding:12px 28px;font-size:14px;font-weight:700;z-index:9999;opacity:0;transition:all .35s;pointer-events:none;white-space:nowrap;box-shadow:var(--shadow-lg);}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ══════════════════════════════════════════
+     PAGE 1 — SPLASH
+  ══════════════════════════════════════════ */
+  #pg-splash{background:linear-gradient(160deg,#0b1628 0%,#0f2d52 45%,#0b1d3a 100%);position:relative;overflow:hidden;}
+  .splash-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);background-size:44px 44px;pointer-events:none;}
+  .splash-glow{position:absolute;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(59,130,246,.22) 0%,transparent 65%);top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;animation:pulse 4s ease-in-out infinite;}
+  .splash-circles{position:absolute;inset:0;pointer-events:none;}
+  .splash-circles span{position:absolute;border-radius:50%;border:1px solid rgba(255,255,255,.07);}
+  .splash-circles span:nth-child(1){width:200px;height:200px;top:-60px;right:-60px;}
+  .splash-circles span:nth-child(2){width:120px;height:120px;bottom:100px;left:-40px;}
+  .splash-circles span:nth-child(3){width:80px;height:80px;bottom:200px;right:20px;}
+
+  .splash-header{display:flex;justify-content:space-between;align-items:center;padding:26px 22px 0;position:relative;z-index:2;}
+  .logo-row{display:flex;align-items:center;gap:10px;}
+  .logo-box{width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 4px 20px rgba(29,78,216,.45);}
+  .logo-title{font-family:'Baloo 2',cursive;font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px;}
+  .logo-title-dark{font-family:'Baloo 2',cursive;font-size:22px;font-weight:900;color:var(--dark);letter-spacing:-.5px;}
+
+  /* Language Picker */
+  .lang-btn{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.22);color:#fff;border-radius:50px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:700;font-family:'Nunito',sans-serif;backdrop-filter:blur(8px);transition:all .2s;position:relative;}
+  .lang-btn:hover{background:rgba(255,255,255,.2);}
+  .lang-dropdown{position:absolute;right:0;top:calc(100% + 8px);background:#fff;border-radius:16px;box-shadow:var(--shadow-lg);z-index:100;overflow:hidden;min-width:170px;animation:slideUp .2s ease;}
+  .lang-opt{display:flex;align-items:center;gap:10px;width:100%;padding:11px 18px;border:none;background:transparent;cursor:pointer;font-size:14px;font-weight:600;color:var(--dark);font-family:'Nunito',sans-serif;transition:background .15s;}
+  .lang-opt:hover{background:var(--blue-light);}
+  .lang-opt.active{background:var(--blue-light);color:var(--blue);}
+
+  .splash-center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;z-index:2;padding:0 24px;}
+  .splash-hero-title{font-family:'Baloo 2',cursive;font-size:78px;font-weight:900;color:#fff;letter-spacing:-4px;line-height:1;text-shadow:0 6px 40px rgba(59,130,246,.6);animation:float 5s ease-in-out infinite;}
+  .splash-slogan{font-size:14px;color:rgba(255,255,255,.65);margin-top:10px;text-align:center;max-width:270px;line-height:1.6;font-weight:600;}
+  .splash-stats{display:flex;gap:0;margin-top:36px;background:rgba(255,255,255,.09);border-radius:22px;padding:18px 20px;backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.13);}
+  .stat-item{display:flex;flex-direction:column;align-items:center;padding:0 22px;}
+  .stat-num{font-family:'Baloo 2',cursive;font-size:24px;font-weight:900;color:#fff;line-height:1;}
+  .stat-lbl{font-size:11px;color:rgba(255,255,255,.5);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+  .stat-div{width:1px;background:rgba(255,255,255,.15);margin:0 4px;}
+  .splash-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px;justify-content:center;}
+  .splash-tag{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.75);border-radius:50px;padding:5px 14px;font-size:12px;font-weight:700;}
+
+  .splash-bottom{padding:28px 24px 44px;position:relative;z-index:2;}
+  .next-btn{width:100%;background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border:none;border-radius:50px;padding:19px;font-size:18px;font-weight:800;cursor:pointer;font-family:'Baloo 2',cursive;letter-spacing:.5px;box-shadow:0 8px 32px rgba(29,78,216,.5);transition:all .2s;position:relative;overflow:hidden;}
+  .next-btn::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);pointer-events:none;}
+  .next-btn:hover{transform:translateY(-2px);box-shadow:0 12px 40px rgba(29,78,216,.6);}
+  .next-btn:active{transform:translateY(0);}
+
+  /* ══════════════════════════════════════════
+     PAGE 2 — ROLE
+  ══════════════════════════════════════════ */
+  #pg-role{background:var(--bg);}
+  .form-header{background:var(--white);padding:20px 22px 18px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .role-body{flex:1;padding:30px 22px;display:flex;flex-direction:column;}
+  .role-title{font-family:'Baloo 2',cursive;font-size:28px;font-weight:900;color:var(--dark);text-align:center;}
+  .role-sub{font-size:14px;color:var(--soft);text-align:center;margin-top:5px;font-weight:600;}
+  .role-cards{display:flex;flex-direction:column;gap:16px;margin-top:28px;}
+  .role-card{background:var(--white);border:2.5px solid var(--border);border-radius:22px;padding:26px 22px;cursor:pointer;text-align:left;transition:all .22s;box-shadow:0 3px 16px rgba(0,0,0,.06);display:flex;align-items:center;gap:18px;position:relative;overflow:hidden;}
+  .role-card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .2s;}
+  .role-card.seeker::before{background:linear-gradient(135deg,rgba(29,78,216,.04),transparent);}
+  .role-card.poster::before{background:linear-gradient(135deg,rgba(249,115,22,.04),transparent);}
+  .role-card:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.12);}
+  .role-card:hover::before{opacity:1;}
+  .role-card.seeker:hover{border-color:#93c5fd;}
+  .role-card.poster:hover{border-color:#fdba74;}
+  .role-icon{width:60px;height:60px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;}
+  .role-icon.s{background:var(--blue-light);}
+  .role-icon.p{background:var(--orange-light);}
+  .role-info{flex:1;}
+  .role-card-title{font-family:'Baloo 2',cursive;font-size:20px;font-weight:800;color:var(--dark);}
+  .role-card-sub{font-size:13px;color:var(--soft);font-weight:600;margin-top:3px;}
+  .role-arrow{font-size:22px;color:var(--border);font-weight:700;}
+  .role-card.seeker:hover .role-arrow{color:var(--blue);}
+  .role-card.poster:hover .role-arrow{color:var(--orange);}
+
+  /* ══════════════════════════════════════════
+     FORMS (shared)
+  ══════════════════════════════════════════ */
+  #pg-seeker,#pg-poster{background:var(--bg);}
+  .form-badge{border-radius:50px;padding:6px 16px;font-size:13px;font-weight:800;font-family:'Baloo 2',cursive;}
+  .form-badge.s{background:var(--blue-light);color:var(--blue);}
+  .form-badge.p{background:var(--orange-light);color:var(--orange);}
+  .form-scroll{flex:1;overflow-y:auto;padding:22px 22px 100px;}
+  .form-title{font-family:'Baloo 2',cursive;font-size:24px;font-weight:900;color:var(--dark);margin-bottom:20px;}
+  .field-label{font-size:13px;font-weight:800;color:var(--mid);margin-bottom:6px;margin-top:14px;text-transform:uppercase;letter-spacing:.4px;}
+  .inp{width:100%;border:2px solid var(--border);border-radius:14px;padding:14px 16px;font-size:15px;color:var(--dark);background:var(--white);font-family:'Nunito',sans-serif;outline:none;transition:border .2s,box-shadow .2s;}
+  .inp:focus{border-color:var(--blue2);box-shadow:0 0 0 4px rgba(59,130,246,.12);}
+  .inp.orange:focus{border-color:var(--orange);box-shadow:0 0 0 4px rgba(249,115,22,.12);}
+  .inp-row{display:flex;gap:8px;align-items:center;}
+  .prefix{background:#f1f5f9;border:2px solid var(--border);border-radius:12px;padding:14px 12px;font-size:15px;font-weight:800;color:var(--blue);white-space:nowrap;}
+  .otp-btn{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border:none;border-radius:12px;padding:14px 14px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:'Nunito',sans-serif;transition:opacity .2s;}
+  .otp-btn:disabled{opacity:.45;cursor:not-allowed;}
+  .otp-btn.orange{background:linear-gradient(135deg,var(--orange),var(--orange2));}
+  .verify-btn{background:var(--green);color:#fff;border:none;border-radius:12px;padding:14px 14px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:'Nunito',sans-serif;}
+  .verified-tag{background:var(--green-light);color:var(--green);border-radius:10px;padding:10px 16px;font-size:14px;font-weight:800;margin-top:8px;display:none;}
+  .verified-tag.show{display:block;}
+  select.inp{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;}
+  .primary-btn{width:100%;border:none;border-radius:16px;padding:18px;font-size:17px;font-weight:800;cursor:pointer;font-family:'Baloo 2',cursive;letter-spacing:.4px;margin-top:18px;transition:all .2s;position:relative;overflow:hidden;}
+  .primary-btn.blue{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;box-shadow:0 6px 24px rgba(29,78,216,.35);}
+  .primary-btn.orange{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff;box-shadow:0 6px 24px rgba(249,115,22,.35);}
+  .primary-btn:hover{transform:translateY(-2px);}
+  .primary-btn:disabled{opacity:.55;cursor:not-allowed;transform:none;}
+  .link-btn{background:none;border:none;color:var(--blue);font-size:14px;font-weight:700;cursor:pointer;padding:10px;width:100%;text-align:center;font-family:'Nunito',sans-serif;transition:color .15s;}
+  .link-btn.orange{color:var(--orange);}
+  .link-btn:hover{text-decoration:underline;}
+  .back-btn{position:sticky;bottom:0;background:var(--white);border:none;border-top:1.5px solid var(--border);color:var(--blue);font-size:15px;font-weight:800;cursor:pointer;padding:18px;width:100%;font-family:'Baloo 2',cursive;transition:background .15s;}
+  .back-btn:hover{background:#f0f4ff;}
+  .back-btn.orange{color:var(--orange);}
+  .back-btn.orange:hover{background:#fff5f0;}
+  .divider{display:flex;align-items:center;gap:12px;margin:14px 0;}
+  .divider hr{flex:1;border:none;border-top:1.5px solid var(--border);}
+  .divider span{font-size:12px;font-weight:700;color:var(--soft);}
+  .login-box{background:var(--white);border:2px solid var(--border);border-radius:18px;padding:20px;margin-top:8px;}
+  .login-box-title{font-family:'Baloo 2',cursive;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:14px;}
+
+  /* ══════════════════════════════════════════
+     HOME PAGE
+  ══════════════════════════════════════════ */
+  #pg-home{background:var(--bg);}
+  .home-nav{background:var(--white);padding:16px 20px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 14px rgba(0,0,0,.07);position:sticky;top:0;z-index:20;}
+  .nav-right{display:flex;gap:10px;align-items:center;}
+  .post-fab{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff;border:none;border-radius:50px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;font-family:'Baloo 2',cursive;box-shadow:0 3px 14px rgba(249,115,22,.35);transition:all .2s;}
+  .post-fab:hover{transform:translateY(-1px);}
+  .hamburger{background:#f0f4ff;border:none;border-radius:12px;padding:10px 14px;font-size:20px;cursor:pointer;color:var(--blue);line-height:1;transition:background .15s;}
+  .hamburger:hover{background:#dbeafe;}
+
+  /* Side Menu */
+  .menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:none;}
+  .menu-overlay.show{display:block;}
+  .menu-panel{position:fixed;top:0;right:-280px;width:280px;height:100vh;background:var(--white);z-index:51;box-shadow:var(--shadow-lg);transition:right .3s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column;}
+  .menu-panel.show{right:0;}
+  .menu-user{padding:28px 22px 20px;background:linear-gradient(135deg,var(--blue),var(--blue2));display:flex;align-items:center;gap:14px;}
+  .menu-avatar{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:26px;}
+  .menu-user-name{font-family:'Baloo 2',cursive;font-size:18px;font-weight:800;color:#fff;}
+  .menu-user-loc{font-size:12px;color:rgba(255,255,255,.7);margin-top:2px;font-weight:600;}
+  .menu-items{padding:12px 0;flex:1;}
+  .menu-item{display:flex;align-items:center;gap:14px;padding:14px 24px;cursor:pointer;font-size:15px;font-weight:700;color:var(--dark2);border:none;background:none;width:100%;font-family:'Nunito',sans-serif;transition:background .15s;}
+  .menu-item:hover{background:var(--bg);}
+  .menu-item.logout{color:var(--red);}
+  .menu-item-icon{width:36px;height:36px;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;}
+
+  /* Search */
+  .search-section{background:var(--white);padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;flex-direction:column;gap:10px;}
+  .search-box{display:flex;align-items:center;gap:10px;background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:0 14px;}
+  .search-box:focus-within{border-color:var(--blue2);}
+  .search-ico{font-size:16px;flex-shrink:0;}
+  .search-inp{flex:1;border:none;background:transparent;padding:12px 0;font-size:15px;color:var(--dark);outline:none;font-family:'Nunito',sans-serif;font-weight:600;}
+  .search-inp::placeholder{color:var(--soft);}
+
+  /* Home scroll */
+  .home-scroll{flex:1;overflow-y:auto;padding:20px 20px 80px;}
+  .section-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .section-title{font-family:'Baloo 2',cursive;font-size:19px;font-weight:800;color:var(--dark);}
+  .section-count{font-size:13px;color:var(--soft);font-weight:700;background:var(--border);border-radius:50px;padding:3px 12px;}
+
+  /* Seeker Cards */
+  .seeker-card{background:var(--white);border-radius:18px;padding:16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid #f0f4ff;margin-bottom:12px;transition:all .2s;}
+  .seeker-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.1);}
+  .seeker-av{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#fff;flex-shrink:0;font-family:'Baloo 2',cursive;}
+  .seeker-info{flex:1;}
+  .seeker-name{font-size:16px;font-weight:800;color:var(--dark);}
+  .seeker-prof{font-size:13px;color:var(--blue);font-weight:700;margin-top:2px;}
+  .seeker-meta{display:flex;gap:10px;margin-top:6px;font-size:12px;color:var(--soft);font-weight:700;flex-wrap:wrap;}
+  .hire-btn{background:linear-gradient(135deg,var(--blue),var(--blue2));color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;font-family:'Nunito',sans-serif;transition:all .2s;}
+  .hire-btn:hover{transform:scale(1.05);}
+
+  /* Post Cards */
+  .post-card{background:var(--white);border-radius:18px;padding:16px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.06);border:1.5px solid #fff5f0;margin-bottom:12px;transition:all .2s;}
+  .post-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,.1);}
+  .post-left{display:flex;align-items:flex-start;gap:12px;}
+  .post-ico{width:48px;height:48px;border-radius:14px;background:var(--orange-light);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+  .post-job{font-size:16px;font-weight:800;color:var(--dark);}
+  .post-by{font-size:13px;color:var(--soft);margin-top:2px;font-weight:600;}
+  .post-meta{display:flex;gap:10px;margin-top:6px;font-size:12px;color:var(--soft);font-weight:700;flex-wrap:wrap;}
+  .apply-btn{background:linear-gradient(135deg,var(--orange),var(--orange2));color:#fff;border:none;border-radius:10px;padding:9px 18px;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;font-family:'Nunito',sans-serif;transition:all .2s;}
+  .apply-btn:hover{transform:scale(1.05);}
+  .no-result{text-align:center;color:var(--soft);padding:28px;font-size:14px;font-weight:700;}
+
+  /* Post Job Modal */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;display:none;align-items:flex-end;justify-content:center;}
+  .modal-overlay.show{display:flex;}
+  .modal{background:var(--white);border-radius:28px 28px 0 0;padding:28px 24px 44px;width:100%;max-width:430px;animation:slideUp .3s ease;}
+  .modal-title{font-family:'Baloo 2',cursive;font-size:22px;font-weight:900;color:var(--dark);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+  .modal-close{background:#f1f5f9;border:none;border-radius:50%;width:32px;height:32px;font-size:18px;cursor:pointer;margin-left:auto;display:flex;align-items:center;justify-content:center;color:var(--mid);}
+
+  /* Section divider */
+  .sec-divider{margin:24px 0 20px;border:none;border-top:2px dashed var(--border);}
+
+  /* Avatar colors */
+  .av-blue{background:linear-gradient(135deg,#1d4ed8,#3b82f6);}
+  .av-orange{background:linear-gradient(135deg,#f97316,#fb923c);}
+  .av-green{background:linear-gradient(135deg,#16a34a,#22c55e);}
+  .av-purple{background:linear-gradient(135deg,#7c3aed,#a78bfa);}
+  .av-pink{background:linear-gradient(135deg,#db2777,#f472b6);}
+  .av-teal{background:linear-gradient(135deg,#0d9488,#2dd4bf);}
+
+  /* Loading spinner */
+  .spinner{display:inline-block;width:16px;height:16px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;}
+
+  /* Recaptcha container */
+  #recaptcha-container-s,#recaptcha-container-p{margin-top:8px;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ TOAST ══ -->
+  <div id="toast"></div>
+
+  <!-- ══════════════════════════════════
+       PAGE 1 — SPLASH
+  ══════════════════════════════════ -->
+  <div id="pg-splash" class="page active">
+    <div class="splash-grid"></div>
+    <div class="splash-glow"></div>
+    <div class="splash-circles"><span></span><span></span><span></span></div>
+
+    <!-- Header -->
+    <div class="splash-header">
+      <div class="logo-row">
+        <div class="logo-box">🏗️</div>
+        <span class="logo-title">LokJob</span>
+      </div>
+      <div style="position:relative;">
+        <button class="lang-btn" onclick="toggleLang()" id="langBtnTop">🌐 EN ▾</button>
+        <div class="lang-dropdown" id="langDropTop" style="display:none;">
+          <button class="lang-opt active" onclick="setLang('en','EN')">🇬🇧 English</button>
+          <button class="lang-opt" onclick="setLang('gu','ગુ')">🇮🇳 ગુજરાતી</button>
+          <button class="lang-opt" onclick="setLang('hi','हि')">🇮🇳 हिन्दी</button>
+          <button class="lang-opt" onclick="setLang('mr','मर')">🇮🇳 मराठी</button>
+          <button class="lang-opt" onclick="setLang('ta','த')">🇮🇳 தமிழ்</button>
+          <button class="lang-opt" onclick="setLang('bn','বা')">🇮🇳 বাংলা</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Center -->
+    <div class="splash-center">
+      <div class="splash-hero-title">LokJob</div>
+      <div class="splash-slogan" id="splashSlogan">Local Job &amp; Job Poster Near Your Area</div>
+      <div class="splash-stats">
+        <div class="stat-item">
+          <div class="stat-num">50K+</div>
+          <div class="stat-lbl">Workers</div>
+        </div>
+        <div class="stat-div"></div>
+        <div class="stat-item">
+          <div class="stat-num">10K+</div>
+          <div class="stat-lbl">Jobs</div>
+        </div>
+        <div class="stat-div"></div>
+        <div class="stat-item">
+          <div class="stat-num">200+</div>
+          <div class="stat-lbl">Cities</div>
+        </div>
+      </div>
+      <div class="splash-tags">
+        <span class="splash-tag">👷 Local Workers</span>
+        <span class="splash-tag">📍 Near You</span>
+        <span class="splash-tag">⚡ Instant Hire</span>
+      </div>
+    </div>
+
+    <!-- Next Button -->
+    <div class="splash-bottom">
+      <button class="next-btn" onclick="goTo('pg-role')" id="nextBtn">Next →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       PAGE 2 — ROLE SELECTION
+  ══════════════════════════════════ -->
+  <div id="pg-role" class="page">
+    <div class="form-header">
+      <div class="logo-row">
+        <div class="logo-box" style="width:38px;height:38px;border-radius:11px;font-size:20px;">🏗️</div>
+        <span class="logo-title-dark">LokJob</span>
+      </div>
+    </div>
+    <div class="role-body">
+      <div style="text-align:center;font-size:48px;margin-bottom:8px;">🤝</div>
+      <div class="role-title" id="roleTitle">Who Are You?</div>
+      <div class="role-sub" id="roleSub">Choose your account type to continue</div>
+      <div class="role-cards">
+        <button class="role-card seeker" onclick="goTo('pg-seeker')">
+          <div class="role-icon s">👷</div>
+          <div class="role-info">
+            <div class="role-card-title" id="seekerLabel">Job Seeker</div>
+            <div class="role-card-sub" id="seekerSub">Find local work near you</div>
+          </div>
+          <div class="role-arrow">›</div>
+        </button>
+        <button class="role-card poster" onclick="goTo('pg-poster')">
+          <div class="role-icon p">🏢</div>
+          <div class="role-info">
+            <div class="role-card-title" id="posterLabel">Job Poster</div>
+            <div class="role-card-sub" id="posterSub">Hire local talent fast</div>
+          </div>
+          <div class="role-arrow">›</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       PAGE 3 — JOB SEEKER FORM
+  ══════════════════════════════════ -->
+  <div id="pg-seeker" class="page">
+    <div class="form-header">
+      <div class="logo-row">
+        <div class="logo-box" style="width:38px;height:38px;border-radius:11px;font-size:20px;">🏗️</div>
+        <span class="logo-title-dark">LokJob</span>
+      </div>
+      <span class="form-badge s">👷 Job Seeker</span>
+    </div>
+
+    <div class="form-scroll" id="seekerFormScroll">
+      <!-- Register Form -->
+      <div id="seekerRegister">
+        <div class="form-title">Create Account</div>
+        <div class="field-label">Full Name</div>
+        <input class="inp" type="text" id="sName" placeholder="Enter your full name"/>
+        <div class="field-label">Phone Number</div>
+        <div class="inp-row">
+          <span class="prefix">+91</span>
+          <input class="inp" type="tel" id="sPhone" placeholder="10-digit number" maxlength="10" oninput="checkPhone('s')" style="flex:1;margin:0;"/>
+          <button class="otp-btn" id="sSendOtp" onclick="sendOtp('s')" disabled>Send OTP</button>
+        </div>
+        <!-- invisible reCAPTCHA anchor for seeker -->
+        <div id="recaptcha-container-s"></div>
+        <div id="sOtpRow" style="display:none;margin-top:10px;">
+          <div class="field-label">Enter OTP <span style="color:#94a3b8;font-weight:600;">(sent to your number)</span></div>
+          <div class="inp-row">
+            <input class="inp" type="number" id="sOtp" placeholder="6-digit OTP" maxlength="6" style="flex:1;margin:0;"/>
+            <button class="verify-btn" onclick="verifyOtp('s')">Verify ✓</button>
+          </div>
+        </div>
+        <div class="verified-tag" id="sVerified">✓ Number Verified!</div>
+
+        <div class="field-label">Select Your Profession</div>
+        <select class="inp" id="sProfession">
+          <option value="">-- Choose Profession --</option>
+          <optgroup label="⚡ Technical / Trades">
+            <option>Electrician • વીજળી • बिजलीवाला</option>
+            <option>Plumber • પ્લમ્બર • प्लम्बर</option>
+            <option>Carpenter • સુથાર • बढ़ई</option>
+            <option>Mason / Bricklayer • કડિયો • राजमिस्त्री</option>
+            <option>Welder • વેલ્ડર • वेल्डर</option>
+            <option>AC / Refrigeration Technician</option>
+            <option>Mobile / Electronics Repair</option>
+            <option>Mechanic (Auto)</option>
+            <option>Painter • પેઇન્ટર • पेंटर</option>
+            <option>Fabricator / Fitter</option>
+          </optgroup>
+          <optgroup label="🚗 Transport / Delivery">
+            <option>Driver (Car/Truck/Auto) • ડ્રાઈવર</option>
+            <option>Delivery Boy / Courier</option>
+            <option>Loader / Unloader</option>
+          </optgroup>
+          <optgroup label="🍳 Food / Hospitality">
+            <option>Cook / Chef • રsોઈ • रसोइया</option>
+            <option>Waiter / Hotel Staff</option>
+            <option>Bakery Worker</option>
+            <option>Tea / Chai Stall Helper</option>
+          </optgroup>
+          <optgroup label="🏠 Domestic / Home">
+            <option>Housemaid / Domestic Helper</option>
+            <option>Gardener / Mali • માળી</option>
+            <option>Cleaner / Sweeper • સફાઈ</option>
+            <option>Watchman / Security Guard</option>
+          </optgroup>
+          <optgroup label="👗 Fashion / Beauty">
+            <option>Tailor / Darji • દરજી</option>
+            <option>Beautician / Parlour Worker</option>
+            <option>Barber / Hair Stylist</option>
+          </optgroup>
+          <optgroup label="🏥 Health / Care">
+            <option>Nurse / Caretaker</option>
+            <option>Compounder / Medical Assistant</option>
+            <option>Baby Sitter / Child Care</option>
+          </optgroup>
+          <optgroup label="🏭 Factory / Labour">
+            <option>Factory Worker • ફેક્ટરી</option>
+            <option>Packing Worker</option>
+            <option>Machine Operator</option>
+            <option>Warehouse Helper</option>
+          </optgroup>
+          <optgroup label="💼 Office / Services">
+            <option>Data Entry Operator</option>
+            <option>Shop Helper / Salesperson</option>
+            <option>Accountant / Billing</option>
+            <option>Receptionist</option>
+            <option>Teacher / Tutor • શિક્ષક</option>
+            <option>Photographer / Videographer</option>
+          </optgroup>
+          <optgroup label="📦 Other">
+            <option>Construction Labour</option>
+            <option>Agricultural Worker • ખેત</option>
+            <option>Other / અન્ય / अन्य</option>
+          </optgroup>
+        </select>
+
+        <div class="field-label">Your Area / City</div>
+        <input class="inp" type="text" id="sArea" placeholder="e.g. Rajkot, Ahmedabad, Surat..."/>
+
+        <div class="field-label">Create Password</div>
+        <input class="inp" type="password" id="sPass" placeholder="Minimum 6 characters"/>
+
+        <button class="primary-btn blue" id="sCreateBtn" onclick="createAccount('seeker')">🎉 Create Account</button>
+
+        <div class="divider"><hr/><span>OR</span><hr/></div>
+
+        <!-- Already have account -->
+        <div class="login-box" id="seekerLoginBox">
+          <div class="login-box-title">Already have an account?</div>
+          <div class="field-label">Phone Number</div>
+          <div class="inp-row">
+            <span class="prefix">+91</span>
+            <input class="inp" type="tel" id="sLoginPhone" placeholder="Phone number" style="flex:1;margin:0;"/>
+          </div>
+          <div class="field-label" style="margin-top:10px;">Password</div>
+          <input class="inp" type="password" id="sLoginPass" placeholder="Your password" style="margin-top:6px;"/>
+          <button class="primary-btn blue" id="sLoginBtn" onclick="doLogin('seeker')" style="margin-top:12px;">Login →</button>
+          <button class="link-btn" onclick="showForgot('s')">Forgot Password?</button>
+        </div>
+      </div>
+
+      <!-- Forgot Password -->
+      <div id="seekerForgot" style="display:none;">
+        <div class="form-title">🔑 Reset Password</div>
+        <div class="field-label">Phone Number</div>
+        <div class="inp-row">
+          <span class="prefix">+91</span>
+          <input class="inp" type="tel" id="sForgotPhone" placeholder="Registered number" style="flex:1;margin:0;"/>
+          <button class="otp-btn" onclick="sendForgotOtp('s')">Send OTP</button>
+        </div>
+        <div id="sForgotOtpRow" style="display:none;margin-top:10px;">
+          <div class="field-label">Enter OTP</div>
+          <input class="inp" type="number" id="sForgotOtp" placeholder="6-digit OTP" maxlength="6"/>
+        </div>
+        <div class="field-label">New Password</div>
+        <input class="inp" type="password" id="sForgotNewPass" placeholder="New password"/>
+        <button class="primary-btn blue" onclick="resetPassword('s')">Reset Password</button>
+        <button class="link-btn" onclick="document.getElementById('seekerForgot').style.display='none';document.getElementById('seekerRegister').style.display='block';">← Back</button>
+      </div>
+    </div>
+
+    <button class="back-btn" onclick="goTo('pg-role')">← Back</button>
+  </div>
+
+  <!-- ══════════════════════════════════
+       PAGE 4 — JOB POSTER FORM
+  ══════════════════════════════════ -->
+  <div id="pg-poster" class="page">
+    <div class="form-header">
+      <div class="logo-row">
+        <div class="logo-box" style="width:38px;height:38px;border-radius:11px;font-size:20px;">🏗️</div>
+        <span class="logo-title-dark">LokJob</span>
+      </div>
+      <span class="form-badge p">🏢 Job Poster</span>
+    </div>
+
+    <div class="form-scroll">
+      <div id="posterRegister">
+        <div class="form-title">Create Poster Account</div>
+        <div class="field-label">Full Name / Company Name</div>
+        <input class="inp orange" type="text" id="pName" placeholder="Your name or company name"/>
+        <div class="field-label">Phone Number</div>
+        <div class="inp-row">
+          <span class="prefix" style="color:var(--orange);">+91</span>
+          <input class="inp orange" type="tel" id="pPhone" placeholder="10-digit number" maxlength="10" oninput="checkPhone('p')" style="flex:1;margin:0;"/>
+          <button class="otp-btn orange" id="pSendOtp" onclick="sendOtp('p')" disabled>Send OTP</button>
+        </div>
+        <!-- invisible reCAPTCHA anchor for poster -->
+        <div id="recaptcha-container-p"></div>
+        <div id="pOtpRow" style="display:none;margin-top:10px;">
+          <div class="field-label">Enter OTP</div>
+          <div class="inp-row">
+            <input class="inp orange" type="number" id="pOtp" placeholder="6-digit OTP" maxlength="6" style="flex:1;margin:0;"/>
+            <button class="verify-btn" onclick="verifyOtp('p')">Verify ✓</button>
+          </div>
+        </div>
+        <div class="verified-tag" id="pVerified">✓ Number Verified!</div>
+
+        <div class="field-label">Create Password</div>
+        <input class="inp orange" type="password" id="pPass" placeholder="Minimum 6 characters"/>
+
+        <button class="primary-btn orange" id="pCreateBtn" onclick="createAccount('poster')">🎉 Create Account</button>
+
+        <div class="divider"><hr/><span>OR</span><hr/></div>
+
+        <div class="login-box">
+          <div class="login-box-title">Already have an account?</div>
+          <div class="field-label">Phone Number</div>
+          <div class="inp-row">
+            <span class="prefix" style="color:var(--orange);">+91</span>
+            <input class="inp orange" type="tel" id="pLoginPhone" placeholder="Phone number" style="flex:1;margin:0;"/>
+          </div>
+          <div class="field-label" style="margin-top:10px;">Password</div>
+          <input class="inp orange" type="password" id="pLoginPass" placeholder="Your password" style="margin-top:6px;"/>
+          <button class="primary-btn orange" id="pLoginBtn" onclick="doLogin('poster')" style="margin-top:12px;">Login →</button>
+          <button class="link-btn orange" onclick="showForgot('p')">Forgot Password?</button>
+        </div>
+      </div>
+
+      <div id="posterForgot" style="display:none;">
+        <div class="form-title">🔑 Reset Password</div>
+        <div class="field-label">Phone Number</div>
+        <div class="inp-row">
+          <span class="prefix" style="color:var(--orange);">+91</span>
+          <input class="inp orange" type="tel" id="pForgotPhone" placeholder="Registered number" style="flex:1;margin:0;"/>
+          <button class="otp-btn orange" onclick="sendForgotOtp('p')">Send OTP</button>
+        </div>
+        <div id="pForgotOtpRow" style="display:none;margin-top:10px;">
+          <div class="field-label">Enter OTP</div>
+          <input class="inp orange" type="number" id="pForgotOtp" placeholder="6-digit OTP" maxlength="6"/>
+        </div>
+        <div class="field-label">New Password</div>
+        <input class="inp orange" type="password" id="pForgotNewPass" placeholder="New password"/>
+        <button class="primary-btn orange" onclick="resetPassword('p')">Reset Password</button>
+        <button class="link-btn orange" onclick="document.getElementById('posterForgot').style.display='none';document.getElementById('posterRegister').style.display='block';">← Back</button>
+      </div>
+    </div>
+
+    <button class="back-btn orange" onclick="goTo('pg-role')">← Back</button>
+  </div>
+
+  <!-- ══════════════════════════════════
+       PAGE 5 — HOME
+  ══════════════════════════════════ -->
+  <div id="pg-home" class="page">
+    <!-- Nav -->
+    <div class="home-nav">
+      <div class="logo-row">
+        <div class="logo-box" style="width:38px;height:38px;border-radius:11px;font-size:20px;">🏗️</div>
+        <span class="logo-title-dark">LokJob</span>
+      </div>
+      <div class="nav-right">
+        <button class="post-fab" onclick="openModal()">＋ Post Job</button>
+        <button class="hamburger" onclick="openMenu()">☰</button>
+      </div>
+    </div>
+
+    <!-- Side Menu -->
+    <div class="menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+    <div class="menu-panel" id="menuPanel">
+      <div class="menu-user">
+        <div class="menu-avatar">👤</div>
+        <div>
+          <div class="menu-user-name" id="menuUserName">My Account</div>
+          <div class="menu-user-loc" id="menuUserLoc">📍 Rajkot, Gujarat</div>
+        </div>
+      </div>
+      <div class="menu-items">
+        <button class="menu-item" onclick="closeMenu();showToast('Opening Account...')">
+          <div class="menu-item-icon">👤</div> Your Account
+        </button>
+        <button class="menu-item" onclick="closeMenu();showToast('Help Center')">
+          <div class="menu-item-icon">❓</div> Help &amp; Support
+        </button>
+        <button class="menu-item" onclick="closeMenu();toggleLang()">
+          <div class="menu-item-icon">🌐</div> Language
+        </button>
+        <button class="menu-item" onclick="closeMenu();showToast('Sharing App...')">
+          <div class="menu-item-icon">🔗</div> Share LokJob
+        </button>
+        <button class="menu-item logout" onclick="doLogout()">
+          <div class="menu-item-icon" style="background:#fee2e2;">🚪</div> Logout
+        </button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="search-section">
+      <div class="search-box">
+        <span class="search-ico">🔍</span>
+        <input class="search-inp" id="searchQ" placeholder="Search job category..." oninput="filterCards()"/>
+      </div>
+      <div class="search-box">
+        <span class="search-ico">📍</span>
+        <input class="search-inp" id="searchLoc" placeholder="Filter by location..." oninput="filterCards()"/>
+      </div>
+    </div>
+
+    <!-- Scroll content -->
+    <div class="home-scroll">
+      <!-- Workers -->
+      <div class="section-hdr">
+        <span class="section-title">👷 Available Workers</span>
+        <span class="section-count" id="seekerCount">Loading...</span>
+      </div>
+      <div id="seekerList">
+        <!-- Rendered by JS -->
+      </div>
+
+      <hr class="sec-divider"/>
+
+      <!-- Job Posts -->
+      <div class="section-hdr">
+        <span class="section-title">🏢 Job Openings</span>
+        <span class="section-count" id="postCount">Loading...</span>
+      </div>
+      <div id="postList">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ POST JOB MODAL ══ -->
+  <div class="modal-overlay" id="postModal">
+    <div class="modal">
+      <div class="modal-title">
+        🏢 Post a New Job
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="field-label">Job Title / Role</div>
+      <input class="inp orange" type="text" id="jTitle" placeholder="e.g. Electrician Needed, Driver Required..."/>
+      <div class="field-label">Location</div>
+      <input class="inp orange" type="text" id="jLocation" placeholder="e.g. Rajkot, Surat, Ahmedabad..."/>
+      <div class="field-label">Salary / Contact Info</div>
+      <input class="inp orange" type="text" id="jSalary" placeholder="e.g. ₹600/day, ₹15,000/mo, Call 98765..."/>
+      <button class="primary-btn orange" id="postJobBtn" onclick="postJob()">📢 Post Job Now</button>
+      <button class="link-btn orange" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   CONFIG — update this URL after deploying your backend
+   ════════════════════════════════════════════════════════ */
+const API_BASE = 'https://your-backend.onrender.com'; // ← change after deploy
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════════════════ */
+let currentUser = JSON.parse(localStorage.getItem('lokjob_user') || 'null');
+let ALL_SEEKERS = [];
+let ALL_POSTS   = [];
+
+// Firebase confirmation result holders
+let sConfirmResult = null;
+let pConfirmResult = null;
+let sForgotConfirm = null;
+let pForgotConfirm = null;
+
+/* ═══════════════════════════════════════════════════════════
+   PAGE NAVIGATION
+   ════════════════════════════════════════════════════════ */
+function goTo(id){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0, 0);
+  if(id === 'pg-home'){
+    updateMenuUser();
+    loadHome();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   TOAST
+   ════════════════════════════════════════════════════════ */
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LANGUAGE
+   ════════════════════════════════════════════════════════ */
+const LANG_SLOGANS = {
+  en: "Local Job & Job Poster Near Your Area",
+  gu: "તમારા વિસ્તારમાં સ્થાનિક નોકરી",
+  hi: "आपके क्षेत्र में स्थानीय नौकरी",
+  mr: "तुमच्या परिसरातील स्थानिक नोकरी",
+  ta: "உங்கள் பகுதியில் உள்ள உள்ளூர் வேலை",
+  bn: "আপনার এলাকায় স্থানীয় চাকরি",
+};
+function toggleLang(){
+  const d = document.getElementById('langDropTop');
+  d.style.display = d.style.display === 'none' ? 'block' : 'none';
+}
+function setLang(code, label){
+  document.getElementById('langBtnTop').textContent = '🌐 ' + label + ' ▾';
+  document.getElementById('splashSlogan').textContent = LANG_SLOGANS[code] || LANG_SLOGANS.en;
+  document.getElementById('langDropTop').style.display = 'none';
+  document.querySelectorAll('.lang-opt').forEach(o => o.classList.remove('active'));
+  event.target.classList.add('active');
+  showToast('Language changed!');
+}
+document.addEventListener('click', function(e){
+  if(!e.target.closest('.lang-btn') && !e.target.closest('.lang-dropdown')){
+    const d = document.getElementById('langDropTop');
+    if(d) d.style.display = 'none';
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════
+   INPUT VALIDATION
+   ════════════════════════════════════════════════════════ */
+function sanitize(str){
+  return String(str).trim().replace(/[<>"'`]/g, '');
+}
+function checkPhone(pfx){
+  const phoneEl = document.getElementById(pfx === 's' ? 'sPhone' : 'pPhone');
+  const btn     = document.getElementById(pfx === 's' ? 'sSendOtp' : 'pSendOtp');
+  btn.disabled  = phoneEl.value.replace(/\D/g,'').length < 10;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FIREBASE — OTP AUTH
+   ════════════════════════════════════════════════════════ */
+function initRecaptcha(containerId){
+  if(!window._fbAuth) return null;
+  return new window._RecaptchaVerifier(window._fbAuth, containerId, {
+    size: 'invisible',
+    callback: () => {}
+  });
+}
+
+async function sendOtp(pfx){
+  const phoneEl = document.getElementById(pfx === 's' ? 'sPhone' : 'pPhone');
+  const btn     = document.getElementById(pfx === 's' ? 'sSendOtp' : 'pSendOtp');
+  const phone   = '+91' + phoneEl.value.replace(/\D/g,'').slice(-10);
+
+  if(phone.length < 13){ showToast('Enter valid 10-digit number'); return; }
+  if(!window._firebaseReady){ showToast('Auth not ready, please wait...'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const containerId = pfx === 's' ? 'recaptcha-container-s' : 'recaptcha-container-p';
+    const recaptcha   = initRecaptcha(containerId);
+    const confirmResult = await window._signInWithPhone(window._fbAuth, phone, recaptcha);
+
+    if(pfx === 's') sConfirmResult = confirmResult;
+    else            pConfirmResult = confirmResult;
+
+    document.getElementById(pfx + 'OtpRow').style.display = 'block';
+    showToast('OTP sent to your number! 📱');
+  } catch(err){
+    console.error(err);
+    showToast('Failed to send OTP: ' + (err.message || 'Unknown error'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Send OTP';
+  }
+}
+
+async function verifyOtp(pfx){
+  const otpVal     = document.getElementById(pfx + 'Otp').value.trim();
+  const confirmRes = pfx === 's' ? sConfirmResult : pConfirmResult;
+
+  if(!otpVal || otpVal.length < 6){ showToast('Enter 6-digit OTP'); return; }
+  if(!confirmRes){ showToast('Please send OTP first'); return; }
+
+  try {
+    await confirmRes.confirm(otpVal);
+    document.getElementById(pfx + 'Verified').classList.add('show');
+    document.getElementById(pfx + 'OtpRow').style.display = 'none';
+    showToast('✓ Number Verified!');
+  } catch(err){
+    console.error(err);
+    showToast('Invalid OTP. Please try again.');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   FORGOT PASSWORD OTP
+   ════════════════════════════════════════════════════════ */
+async function sendForgotOtp(pfx){
+  const phoneEl = document.getElementById(pfx === 's' ? 'sForgotPhone' : 'pForgotPhone');
+  const phone   = '+91' + phoneEl.value.replace(/\D/g,'').slice(-10);
+  if(phone.length < 13){ showToast('Enter valid phone'); return; }
+
+  try {
+    const containerId = pfx === 's' ? 'recaptcha-container-s' : 'recaptcha-container-p';
+    const recaptcha   = initRecaptcha(containerId);
+    const confirmRes  = await window._signInWithPhone(window._fbAuth, phone, recaptcha);
+    if(pfx === 's') sForgotConfirm = confirmRes;
+    else            pForgotConfirm = confirmRes;
+    document.getElementById(pfx + 'ForgotOtpRow').style.display = 'block';
+    showToast('OTP sent! 📱');
+  } catch(err){
+    showToast('Could not send OTP: ' + (err.message || ''));
+  }
+}
+
+async function resetPassword(pfx){
+  const otpVal    = document.getElementById(pfx + 'ForgotOtp').value.trim();
+  const newPass   = document.getElementById(pfx + 'ForgotNewPass').value.trim();
+  const phoneEl   = document.getElementById(pfx === 's' ? 'sForgotPhone' : 'pForgotPhone');
+  const phone     = '+91' + phoneEl.value.replace(/\D/g,'').slice(-10);
+  const confirmRes = pfx === 's' ? sForgotConfirm : pForgotConfirm;
+
+  if(!otpVal || otpVal.length < 6){ showToast('Enter 6-digit OTP'); return; }
+  if(!newPass || newPass.length < 6){ showToast('Password must be 6+ chars'); return; }
+  if(!confirmRes){ showToast('Send OTP first'); return; }
+
+  try {
+    await confirmRes.confirm(otpVal);
+    const res = await fetch(`${API_BASE}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: sanitize(phone), newPassword: sanitize(newPass) })
+    });
+    const data = await res.json();
+    if(res.ok){
+      showToast('Password Reset! ✓');
+      document.getElementById(pfx === 's' ? 'seekerForgot' : 'posterForgot').style.display = 'none';
+      document.getElementById(pfx === 's' ? 'seekerRegister' : 'posterRegister').style.display = 'block';
+    } else {
+      showToast(data.error || 'Reset failed');
+    }
+  } catch(err){
+    showToast('Invalid OTP or error: ' + (err.message || ''));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SHOW FORGOT
+   ════════════════════════════════════════════════════════ */
+function showForgot(pfx){
+  if(pfx === 's'){
+    document.getElementById('seekerRegister').style.display = 'none';
+    document.getElementById('seekerForgot').style.display   = 'block';
+  } else {
+    document.getElementById('posterRegister').style.display = 'none';
+    document.getElementById('posterForgot').style.display   = 'block';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CREATE ACCOUNT — POST /register
+   ════════════════════════════════════════════════════════ */
+async function createAccount(role){
+  const isSeeker = role === 'seeker';
+  const name     = sanitize(document.getElementById(isSeeker ? 'sName' : 'pName').value);
+  const phone    = sanitize(document.getElementById(isSeeker ? 'sPhone' : 'pPhone').value.replace(/\D/g,''));
+  const pass     = document.getElementById(isSeeker ? 'sPass' : 'pPass').value;
+  const prof     = isSeeker ? sanitize(document.getElementById('sProfession').value) : '';
+  const area     = isSeeker ? sanitize(document.getElementById('sArea').value) : '';
+  const verified = document.getElementById(isSeeker ? 'sVerified' : 'pVerified').classList.contains('show');
+
+  // Validations
+  if(!name)                   { showToast('Enter your name'); return; }
+  if(phone.length !== 10)     { showToast('Enter valid 10-digit phone'); return; }
+  if(!verified)               { showToast('Verify your phone number first'); return; }
+  if(pass.length < 6)         { showToast('Password must be 6+ characters'); return; }
+  if(isSeeker && !prof)       { showToast('Select your profession'); return; }
+  if(isSeeker && !area)       { showToast('Enter your area/city'); return; }
+
+  const btn = document.getElementById(isSeeker ? 'sCreateBtn' : 'pCreateBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Creating...';
+
+  try {
+    const res = await fetch(`${API_BASE}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, phone, role, profession: prof, area, password: pass })
+    });
+    const data = await res.json();
+    if(res.ok){
+      currentUser = data.user;
+      localStorage.setItem('lokjob_user', JSON.stringify(currentUser));
+      showToast('🎉 Account Created! Welcome to LokJob!');
+      setTimeout(() => goTo('pg-home'), 900);
+    } else {
+      showToast(data.error || 'Registration failed');
+    }
+  } catch(err){
+    console.error(err);
+    showToast('Network error. Check backend URL.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🎉 Create Account';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOGIN
+   ════════════════════════════════════════════════════════ */
+async function doLogin(role){
+  const isSeeker = role === 'seeker';
+  const phone    = sanitize(document.getElementById(isSeeker ? 'sLoginPhone' : 'pLoginPhone').value.replace(/\D/g,''));
+  const pass     = document.getElementById(isSeeker ? 'sLoginPass' : 'pLoginPass').value;
+
+  if(phone.length !== 10){ showToast('Enter valid phone'); return; }
+  if(!pass)               { showToast('Enter password'); return; }
+
+  const btn = document.getElementById(isSeeker ? 'sLoginBtn' : 'pLoginBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Logging in...';
+
+  try {
+    const res  = await fetch(`${API_BASE}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password: pass })
+    });
+    const data = await res.json();
+    if(res.ok){
+      currentUser = data.user;
+      localStorage.setItem('lokjob_user', JSON.stringify(currentUser));
+      showToast('✓ Login Successful! Welcome back!');
+      setTimeout(() => goTo('pg-home'), 900);
+    } else {
+      showToast(data.error || 'Login failed');
+    }
+  } catch(err){
+    console.error(err);
+    showToast('Network error. Check backend URL.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Login →';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOGOUT
+   ════════════════════════════════════════════════════════ */
+async function doLogout(){
+  closeMenu();
+  try {
+    if(window._fbAuth && window._fbSignOut) await window._fbSignOut(window._fbAuth);
+  } catch(e){}
+  currentUser = null;
+  localStorage.removeItem('lokjob_user');
+  showToast('Logged out. See you! 👋');
+  setTimeout(() => goTo('pg-splash'), 700);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MENU USER INFO
+   ════════════════════════════════════════════════════════ */
+function updateMenuUser(){
+  if(currentUser){
+    document.getElementById('menuUserName').textContent = currentUser.name || 'My Account';
+    document.getElementById('menuUserLoc').textContent  = '📍 ' + (currentUser.area || 'India');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MENU
+   ════════════════════════════════════════════════════════ */
+function openMenu(){
+  document.getElementById('menuOverlay').classList.add('show');
+  document.getElementById('menuPanel').classList.add('show');
+}
+function closeMenu(){
+  document.getElementById('menuOverlay').classList.remove('show');
+  document.getElementById('menuPanel').classList.remove('show');
+}
+
+/* ═══════════════════════════════════════════════════════════
+   POST JOB MODAL — POST /job
+   ════════════════════════════════════════════════════════ */
+function openModal(){
+  if(!currentUser){ showToast('Please login to post a job'); return; }
+  document.getElementById('postModal').classList.add('show');
+}
+function closeModal(){
+  document.getElementById('postModal').classList.remove('show');
+}
+
+async function postJob(){
+  const title    = sanitize(document.getElementById('jTitle').value);
+  const location = sanitize(document.getElementById('jLocation').value);
+  const salary   = sanitize(document.getElementById('jSalary').value);
+
+  if(!title || !location){ showToast('Please fill Job Title & Location'); return; }
+
+  const btn = document.getElementById('postJobBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Posting...';
+
+  try {
+    const res  = await fetch(`${API_BASE}/job`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        poster:   currentUser ? currentUser.name : 'Anonymous',
+        posterId: currentUser ? currentUser._id  : null,
+        job:      title,
+        location,
+        salary:   salary || 'Contact'
+      })
+    });
+    const data = await res.json();
+    if(res.ok){
+      closeModal();
+      document.getElementById('jTitle').value    = '';
+      document.getElementById('jLocation').value = '';
+      document.getElementById('jSalary').value   = '';
+      showToast('📢 Job Posted Successfully!');
+      await loadHome();
+    } else {
+      showToast(data.error || 'Post failed');
+    }
+  } catch(err){
+    console.error(err);
+    showToast('Network error. Check backend URL.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📢 Post Job Now';
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOAD HOME — GET /jobs + GET /seekers
+   ════════════════════════════════════════════════════════ */
+async function loadHome(){
+  try {
+    const [seekersRes, jobsRes] = await Promise.all([
+      fetch(`${API_BASE}/seekers`),
+      fetch(`${API_BASE}/jobs`)
+    ]);
+    ALL_SEEKERS = seekersRes.ok  ? await seekersRes.json() : [];
+    ALL_POSTS   = jobsRes.ok     ? await jobsRes.json()    : [];
+  } catch(err){
+    console.warn('Could not reach backend, using local data:', err);
+    // Fallback to seed data if backend unreachable
+    ALL_SEEKERS = SEED_SEEKERS;
+    ALL_POSTS   = SEED_POSTS;
+  }
+  renderHome();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SEED DATA (shown when backend is unreachable)
+   ════════════════════════════════════════════════════════ */
+const SEED_SEEKERS = [
+  {name:"Ramesh Patel",   profession:"Electrician",   area:"Rajkot",    rating:4.8, jobs:42},
+  {name:"Suresh Kumar",   profession:"Plumber",        area:"Ahmedabad", rating:4.5, jobs:28},
+  {name:"Anita Sharma",   profession:"Tailor",         area:"Surat",     rating:4.9, jobs:65},
+  {name:"Deepak Verma",   profession:"Driver",         area:"Rajkot",    rating:4.7, jobs:33},
+  {name:"Priya Joshi",    profession:"Cook / Chef",    area:"Vadodara",  rating:4.6, jobs:19},
+  {name:"Manoj Singh",    profession:"Carpenter",      area:"Rajkot",    rating:4.4, jobs:51},
+];
+const SEED_POSTS = [
+  {poster:"Sunrise Builders", job:"Mason Needed Urgently",  location:"Rajkot",    salary:"₹600/day",   createdAt: new Date(Date.now()-7200000).toISOString()},
+  {poster:"City Hotel",       job:"Cook / Chef Required",   location:"Ahmedabad", salary:"₹15,000/mo", createdAt: new Date(Date.now()-18000000).toISOString()},
+  {poster:"Ravi Transport",   job:"Driver Wanted",          location:"Surat",     salary:"₹18,000/mo", createdAt: new Date(Date.now()-86400000).toISOString()},
+  {poster:"Home Services",    job:"Electrician – Urgent",   location:"Rajkot",    salary:"₹700/day",   createdAt: new Date(Date.now()-10800000).toISOString()},
+];
+
+/* ═══════════════════════════════════════════════════════════
+   FILTER / RENDER HOME
+   ════════════════════════════════════════════════════════ */
+function filterCards(){ renderHome(); }
+
+const AV_COLORS = ['#1d4ed8','#f97316','#db2777','#16a34a','#7c3aed','#0d9488','#b45309','#0284c7'];
+
+function timeAgo(isoStr){
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const mins = Math.floor(diff/60000);
+  if(mins < 60)  return mins + 'm ago';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24)   return hrs + 'h ago';
+  return Math.floor(hrs/24) + 'd ago';
+}
+
+function renderHome(){
+  const q   = (document.getElementById('searchQ')?.value   || '').toLowerCase();
+  const loc = (document.getElementById('searchLoc')?.value || '').toLowerCase();
+
+  // — Seekers —
+  const filteredS = ALL_SEEKERS.filter(s =>
+    (!q   || (s.profession||'').toLowerCase().includes(q)   || s.name.toLowerCase().includes(q)) &&
+    (!loc || (s.area||'').toLowerCase().includes(loc))
+  );
+  const sEl = document.getElementById('seekerList');
+  document.getElementById('seekerCount').textContent = filteredS.length + ' found';
+
+  if(!filteredS.length){
+    sEl.innerHTML = '<div class="no-result">😕 No workers found for this search</div>';
+  } else {
+    sEl.innerHTML = filteredS.map((s, i) => `
+      <div class="seeker-card">
+        <div class="seeker-av" style="background:linear-gradient(135deg,${AV_COLORS[i%AV_COLORS.length]},${AV_COLORS[(i+2)%AV_COLORS.length]})">${s.name[0]}</div>
+        <div class="seeker-info">
+          <div class="seeker-name">${s.name}</div>
+          <div class="seeker-prof">${s.profession || s.prof || ''}</div>
+          <div class="seeker-meta">
+            <span>📍 ${s.area || ''}</span>
+            <span>⭐ ${s.rating || '4.5'}</span>
+            <span>✅ ${s.jobs || 0} jobs</span>
+          </div>
+        </div>
+        <button class="hire-btn" onclick="showToast('Connecting with ${s.name.replace(/'/g,'')}...')">Hire</button>
+      </div>
+    `).join('');
+  }
+
+  // — Posts —
+  const filteredP = ALL_POSTS.filter(p =>
+    (!q   || (p.job||'').toLowerCase().includes(q)   || (p.poster||'').toLowerCase().includes(q)) &&
+    (!loc || (p.location||'').toLowerCase().includes(loc))
+  );
+  const pEl = document.getElementById('postList');
+  document.getElementById('postCount').textContent = filteredP.length + ' jobs';
+
+  if(!filteredP.length){
+    pEl.innerHTML = '<div class="no-result">😕 No jobs found for this search</div>';
+  } else {
+    pEl.innerHTML = filteredP.map(p => `
+      <div class="post-card">
+        <div class="post-left">
+          <div class="post-ico">🏢</div>
+          <div>
+            <div class="post-job">${p.job}</div>
+            <div class="post-by">${p.poster}</div>
+            <div class="post-meta">
+              <span>📍 ${p.location}</span>
+              <span>💰 ${p.salary || 'Contact'}</span>
+              <span>🕐 ${p.createdAt ? timeAgo(p.createdAt) : 'recently'}</span>
+            </div>
+          </div>
+        </div>
+        <button class="apply-btn" onclick="showToast('Applied to: ${(p.job||'').replace(/'/g,'')}! ✓')">Apply</button>
+      </div>
+    `).join('');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SESSION RESTORE ON LOAD
+   ════════════════════════════════════════════════════════ */
+window.addEventListener('load', function(){
+  if(currentUser){
+    updateMenuUser();
+    goTo('pg-home');
+  }
+});
+</script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+
+<script>
+</body>
+</html>
